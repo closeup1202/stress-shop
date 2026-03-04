@@ -23,6 +23,13 @@ services:
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
 
+  redis:
+    image: redis:7
+    container_name: stress-redis
+    restart: always
+    ports:
+      - "6379:6379"
+
   grafana:
     image: grafana/grafana:latest
     container_name: stress-grafana

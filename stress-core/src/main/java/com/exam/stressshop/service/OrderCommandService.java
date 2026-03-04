@@ -4,10 +4,7 @@ import com.exam.stressshop.domain.order.Order;
 import com.exam.stressshop.domain.product.Product;
 import com.exam.stressshop.domain.user.User;
 import com.exam.stressshop.domain.wallet.Wallet;
-import com.exam.stressshop.repository.OrderRepository;
-import com.exam.stressshop.repository.ProductRepository;
-import com.exam.stressshop.repository.UserRepository;
-import com.exam.stressshop.repository.WalletRepository;
+import com.exam.stressshop.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,38 +20,56 @@ public class OrderCommandService {
     private final UserRepository userRepository;
     private final ProductRepository productRepository;
     private final WalletRepository walletRepository;
+    private final StockCacheRepository stockCacheRepository;
 
     public Long createOrder(Long userId, Long productId, int quantity) {
 
-        // 1. 사용자 조회
-        User user = userRepository.getReferenceById(userId);
+        // 1️⃣ Redis 선차감
+        boolean redisSuccess = stockCacheRepository.decrease(productId, quantity);
 
-        // 2. 상품 조회
-        Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new IllegalArgumentException("상품 없음"));
-
-        // 3. 결제 금액 계산
-        BigDecimal totalPrice =
-                product.getPrice().multiply(BigDecimal.valueOf(quantity));
-
-        // 4. 잔액 차감
-        int walletUpdated = walletRepository.decreaseBalance(userId, totalPrice);
-
-        if (walletUpdated == 0) {
-            throw new IllegalArgumentException("잔액 부족");
+        if (!redisSuccess) {
+            throw new IllegalArgumentException("품절");
         }
 
-        // 5. 재고 차감
-        int updated = productRepository.decreaseStock(productId, quantity);
+        try {
+            // 2️⃣ 사용자 조회 (프록시 OK)
+            User user = userRepository.getReferenceById(userId);
 
-        if (updated == 0) {
-            throw new IllegalArgumentException("재고 부족");
+            // 3️⃣ 상품 조회 (가격 계산용)
+            Product product = productRepository.findById(productId)
+                    .orElseThrow(() -> new IllegalArgumentException("상품 없음"));
+
+            BigDecimal totalPrice =
+                    product.getPrice().multiply(BigDecimal.valueOf(quantity));
+
+            // 4️⃣ 지갑 차감 (DB atomic update)
+            int walletUpdated =
+                    walletRepository.decreaseBalance(userId, totalPrice);
+
+            if (walletUpdated == 0) {
+                throw new IllegalArgumentException("잔액 부족");
+            }
+
+            // 5️⃣ DB 재고 차감 (정합성 보장용)
+            int updated = productRepository.decreaseStock(productId, quantity);
+
+            if (updated == 0) {
+                throw new IllegalStateException("DB 재고 부족");
+            }
+
+            // 6️⃣ 주문 저장
+            Order order = Order.create(user, product, quantity, totalPrice);
+
+            orderRepository.save(order);
+
+            return order.getId();
+
+        } catch (Exception e) {
+
+            // 🔥 실패 시 Redis 롤백
+            stockCacheRepository.increase(productId, quantity);
+
+            throw e;
         }
-
-        // 6. 주문 생성
-        Order order = Order.create(user, product, quantity, totalPrice);
-        orderRepository.save(order);
-
-        return order.getId();
     }
 }

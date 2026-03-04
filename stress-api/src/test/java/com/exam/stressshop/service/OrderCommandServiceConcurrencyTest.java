@@ -9,10 +9,13 @@ import com.exam.stressshop.repository.WalletRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -34,30 +37,48 @@ class OrderCommandServiceConcurrencyTest {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private StringRedisTemplate redisTemplate;
+
     @Test
     void multiThreadCrashTest() throws InterruptedException {
         // given
-        User user = userRepository.save(
-                User.create("홍길동", "test@naver.com", "123456")
-        );
+        int userCount = 50;
+        int stock = 30;
 
         Product product = productRepository.save(
-                Product.create("상품", BigDecimal.valueOf(1000), 100L)
+                Product.create("상품", BigDecimal.valueOf(1000), (long) stock)
         );
 
-        Wallet wallet = walletRepository.save(
-                Wallet.create(user, BigDecimal.valueOf(100000))
+        redisTemplate.opsForValue().set(
+                "product:stock:" + product.getId(),
+                String.valueOf(stock)
         );
 
-        int threadCount = 50;
+        List<User> users = new ArrayList<>();
+
+        for (int i = 0; i < userCount; i++) {
+            User user = userRepository.save(
+                    User.create("user" + i,
+                            "user" + i + "@test.com",
+                            "1234")
+            );
+
+            walletRepository.save(
+                    Wallet.create(user, BigDecimal.valueOf(100000))
+            );
+
+            users.add(user);
+        }
+
         ExecutorService executorService = Executors.newFixedThreadPool(32);
-        CountDownLatch latch = new CountDownLatch(threadCount);
+        CountDownLatch latch = new CountDownLatch(userCount);
 
         AtomicInteger success = new AtomicInteger();
         AtomicInteger fail = new AtomicInteger();
 
         // when
-        for (int i = 0; i < threadCount; i++) {
+        for (User user : users) {
             executorService.submit(() -> {
                 try {
                     orderCommandService.createOrder(
@@ -81,9 +102,7 @@ class OrderCommandServiceConcurrencyTest {
         System.out.println("실패: " + fail.get());
 
         Product updated = productRepository.findById(product.getId()).get();
-        Wallet updatedWallet = walletRepository.findById(user.getId()).get();
 
         System.out.println("남은 재고: " + updated.getStock());
-        System.out.println("남은 잔액: " + updatedWallet.getBalance());
     }
 }
