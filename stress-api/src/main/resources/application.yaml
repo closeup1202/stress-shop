@@ -1,0 +1,36 @@
+spring:
+  application:
+    name: stressshop
+
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://localhost:5432/stressshop
+    username: postgres
+    password: postgres
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 10
+      connection-timeout: 2000
+  jpa:
+    hibernate:
+      ddl-auto: create
+    properties:
+      hibernate:
+        format_sql: true
+    open-in-view: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: prometheus,health,info
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: stressshop
+
+logging:
+  level:
+    org.hibernate.SQL: off
