@@ -26,9 +26,6 @@ public class Wallet extends BaseEntity {
     @Column(nullable = false)
     private BigDecimal balance;
 
-    @Version
-    private Long version;
-
     public static Wallet create(User user, BigDecimal balance) {
         Wallet wallet = new Wallet();
         wallet.user = user;

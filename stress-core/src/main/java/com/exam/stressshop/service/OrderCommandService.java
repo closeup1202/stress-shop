@@ -37,17 +37,21 @@ public class OrderCommandService {
         BigDecimal totalPrice =
                 product.getPrice().multiply(BigDecimal.valueOf(quantity));
 
-        // 4. 지갑 조회 (PK = userId)
-        Wallet wallet = walletRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("지갑 없음"));
+        // 4. 잔액 차감
+        int walletUpdated = walletRepository.decreaseBalance(userId, totalPrice);
 
-        // 5. 잔액 차감
-        wallet.withdraw(totalPrice);
+        if (walletUpdated == 0) {
+            throw new IllegalArgumentException("잔액 부족");
+        }
 
-        // 6. 재고 차감
-        product.decreaseStock(quantity);
+        // 5. 재고 차감
+        int updated = productRepository.decreaseStock(productId, quantity);
 
-        // 7. 주문 생성
+        if (updated == 0) {
+            throw new IllegalArgumentException("재고 부족");
+        }
+
+        // 6. 주문 생성
         Order order = Order.create(user, product, quantity, totalPrice);
         orderRepository.save(order);
 

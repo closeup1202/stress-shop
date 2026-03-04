@@ -25,21 +25,11 @@ public class Product extends BaseEntity {
     @Column(nullable = false)
     private Long stock;
 
-    @Version
-    private Long version;
-
     public static Product create(String name, BigDecimal price, Long stock) {
         Product product = new Product();
         product.name = name;
         product.price = price;
         product.stock = stock;
         return product;
-    }
-
-    public void decreaseStock(long quantity) {
-        if (this.stock < quantity) {
-            throw new IllegalArgumentException("재고 부족");
-        }
-        this.stock -= quantity;
     }
 }
