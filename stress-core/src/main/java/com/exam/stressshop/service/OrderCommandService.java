@@ -7,6 +7,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.UUID;
+
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -17,15 +19,21 @@ public class OrderCommandService {
 
     public void createOrder(Long userId, Long productId, int quantity) {
 
-        // 1️⃣ Redis 선차감
         if (!stockCacheRepository.decrease(productId, quantity)) {
             throw new IllegalArgumentException("품절");
         }
 
+        String eventId = UUID.randomUUID().toString();
+
         try {
-            eventPublisher.publish(
-                    new OrderCreatedEvent(userId, productId, quantity)
-            );
+            OrderCreatedEvent orderCreatedEvent = OrderCreatedEvent.builder()
+                    .eventId(eventId)
+                    .userId(userId)
+                    .productId(productId)
+                    .quantity(quantity)
+                    .build();
+
+            eventPublisher.publish(orderCreatedEvent);
         } catch (Exception e) {
             stockCacheRepository.increase(productId, quantity);
             throw e;

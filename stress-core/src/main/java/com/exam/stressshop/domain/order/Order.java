@@ -19,6 +19,9 @@ public class Order extends BaseEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(unique = true)
+    private String eventId;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
@@ -37,8 +40,9 @@ public class Order extends BaseEntity {
     @Enumerated(EnumType.STRING)
     private OrderStatus orderStatus;
 
-    public static Order create(User user, Product product, int quantity, BigDecimal totalPrice) {
+    public static Order create(String eventId, User user, Product product, int quantity, BigDecimal totalPrice) {
         Order order = new Order();
+        order.eventId = eventId;
         order.user = user;
         order.product = product;
         order.quantity = quantity;

@@ -9,10 +9,9 @@ import lombok.NoArgsConstructor;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class OrderCreatedEvent {
+public class StockRollbackEvent {
 
     private String eventId;
-    private Long userId;
     private Long productId;
     private int quantity;
 }
