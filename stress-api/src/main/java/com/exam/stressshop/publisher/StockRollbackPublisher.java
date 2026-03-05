@@ -1,7 +1,7 @@
 package com.exam.stressshop.publisher;
 
 import com.exam.stressshop.event.StockRollbackEvent;
-import com.exam.stressshop.repository.EventPublisher;
+import com.exam.stressshop.event.EventPublisher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
@@ -14,6 +14,10 @@ public class StockRollbackPublisher implements EventPublisher<StockRollbackEvent
 
     @Override
     public void publish(StockRollbackEvent event) {
-        kafkaTemplate.send("stock-rollback", event);
+        try {
+            kafkaTemplate.send("stock-rollback", event).get();
+        } catch (Exception e) {
+            throw new RuntimeException("재고 롤백 이벤트 발행 실패", e);
+        }
     }
 }

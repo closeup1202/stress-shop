@@ -1,7 +1,7 @@
 package com.exam.stressshop.service;
 
 import com.exam.stressshop.event.OrderCreatedEvent;
-import com.exam.stressshop.repository.EventPublisher;
+import com.exam.stressshop.event.EventPublisher;
 import com.exam.stressshop.repository.StockCacheRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

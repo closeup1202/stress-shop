@@ -14,7 +14,7 @@ public interface WalletRepository extends JpaRepository<Wallet, Long> {
     @Query("""
     UPDATE Wallet w
     SET w.balance = w.balance - :amount
-    WHERE w.id = :userId
+    WHERE w.user.id = :userId
     AND w.balance >= :amount
 """)
     int decreaseBalance(
