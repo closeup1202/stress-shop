@@ -47,7 +47,15 @@ public class Order extends BaseEntity {
         order.product = product;
         order.quantity = quantity;
         order.totalPrice = totalPrice;
-        order.orderStatus = OrderStatus.RECEIVED;
+        order.orderStatus = OrderStatus.PENDING;
         return order;
+    }
+
+    public void complete() {
+        this.orderStatus = OrderStatus.COMPLETED;
+    }
+
+    public void fail() {
+        this.orderStatus = OrderStatus.FAILED;
     }
 }

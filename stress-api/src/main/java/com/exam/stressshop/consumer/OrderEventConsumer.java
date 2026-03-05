@@ -1,11 +1,13 @@
 package com.exam.stressshop.consumer;
 
 import com.exam.stressshop.domain.order.Order;
+import com.exam.stressshop.domain.order.OrderStatus;
 import com.exam.stressshop.domain.product.Product;
 import com.exam.stressshop.domain.user.User;
 import com.exam.stressshop.event.EventPublisher;
 import com.exam.stressshop.event.OrderCreatedEvent;
 import com.exam.stressshop.event.StockRollbackEvent;
+import com.exam.stressshop.metric.OrderMetrics;
 import com.exam.stressshop.repository.OrderRepository;
 import com.exam.stressshop.repository.ProductRepository;
 import com.exam.stressshop.repository.UserRepository;
@@ -26,46 +28,47 @@ public class OrderEventConsumer {
     private final WalletRepository walletRepository;
     private final ProductRepository productRepository;
     private final OrderRepository orderRepository;
-    private final UserRepository userRepository;
     private final EventPublisher<StockRollbackEvent> rollbackPublisher;
+    private final OrderMetrics orderMetrics;
 
-    @KafkaListener(
-            topics = "order-create",
-            groupId = "order-group"
-    )
+    @KafkaListener(topics = "order-create", groupId = "order-group")
     @Transactional
     public void consume(OrderCreatedEvent event) {
         log.info("OrderCreatedEvent: {}", event);
-        if (orderRepository.existsByEventId(event.getEventId())) {
+
+        Order order = orderRepository.findByEventId(event.getEventId())
+                .orElseThrow(() -> new IllegalStateException("Order not found: " + event.getEventId()));
+
+        // 멱등성 체크: 이미 처리된 주문이면 스킵
+        if (order.getOrderStatus() != OrderStatus.PENDING) {
+            log.warn("이미 처리된 주문: {}", event.getEventId());
             return;
         }
 
-        User user = userRepository.getReferenceById(event.getUserId());
-        Product product = productRepository.findById(event.getProductId()).orElseThrow();
-
-        BigDecimal totalPrice = product.getPrice().multiply(BigDecimal.valueOf(event.getQuantity()));
+        BigDecimal totalPrice = order.getTotalPrice();
 
         int walletUpdated = walletRepository.decreaseBalance(event.getUserId(), totalPrice);
-
         if (walletUpdated == 0) {
             throw new RuntimeException("잔액 부족");
         }
 
         int updated = productRepository.decreaseStock(event.getProductId(), event.getQuantity());
-
         if (updated == 0) {
             throw new RuntimeException("DB 재고 부족");
         }
 
-        Order order = Order.create(event.getEventId(), user, product, event.getQuantity(), totalPrice);
-
-        orderRepository.save(order);
+        // Order 상태 업데이트 (새로 생성하지 않음)
+        order.complete();
+        orderMetrics.incrementSuccess();
     }
 
     // 재시도 모두 소진 후 DLQ 도달 시에만 재고 롤백
     @KafkaListener(topics = "order-create.DLQ", groupId = "order-group")
+    @Transactional
     public void handleDlq(OrderCreatedEvent event) {
         log.error("DLQ 도착 이벤트: {}", event);
+
+        orderRepository.findByEventId(event.getEventId()).ifPresent(Order::fail);   // Order 상태 → FAILED
 
         StockRollbackEvent rollbackEvent = StockRollbackEvent.builder()
                 .eventId(event.getEventId())
@@ -74,5 +77,7 @@ public class OrderEventConsumer {
                 .build();
 
         rollbackPublisher.publish(rollbackEvent);
+
+        orderMetrics.incrementDlq();
     }
 }

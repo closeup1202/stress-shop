@@ -1,9 +1,11 @@
 package com.exam.stressshop.service;
 
+import com.exam.stressshop.domain.order.OrderStatus;
 import com.exam.stressshop.domain.product.Product;
 import com.exam.stressshop.domain.user.User;
 import com.exam.stressshop.domain.wallet.Wallet;
 import com.exam.stressshop.repository.OrderRepository;
+import com.exam.stressshop.repository.OutboxEventRepository;
 import com.exam.stressshop.repository.ProductRepository;
 import com.exam.stressshop.repository.UserRepository;
 import com.exam.stressshop.repository.WalletRepository;
@@ -47,10 +49,13 @@ class OrderCommandServiceConcurrencyTest {
     private OrderRepository orderRepository;
 
     @Autowired
+    private OutboxEventRepository outboxRepository;
+
+    @Autowired
     private StringRedisTemplate redisTemplate;
 
     @Test
-    void step3_multiThread_async_kafka_test() throws InterruptedException {
+    void step4_outbox_kafka_test() throws InterruptedException {
 
         // given
         int userCount = 50;
@@ -62,19 +67,13 @@ class OrderCommandServiceConcurrencyTest {
         );
 
         String redisKey = "product:stock:" + product.getId();
-
-        redisTemplate.opsForValue().set(
-                redisKey,
-                String.valueOf(stock)
-        );
+        redisTemplate.opsForValue().set(redisKey, String.valueOf(stock));
 
         List<User> users = new ArrayList<>();
-
         for (int i = 0; i < userCount; i++) {
             User user = userRepository.save(
                     User.create("user" + i, "user" + i + "@test.com", "1234")
             );
-
             walletRepository.save(Wallet.create(user, BigDecimal.valueOf(100000)));
             users.add(user);
         }
@@ -89,11 +88,7 @@ class OrderCommandServiceConcurrencyTest {
         for (User user : users) {
             executorService.submit(() -> {
                 try {
-                    orderCommandService.createOrder(
-                            user.getId(),
-                            product.getId(),
-                            1
-                    );
+                    orderCommandService.createOrder(user.getId(), product.getId(), 1);
                     success.incrementAndGet();
                 } catch (Exception e) {
                     fail.incrementAndGet();
@@ -105,45 +100,48 @@ class OrderCommandServiceConcurrencyTest {
 
         latch.await();
 
-        System.out.println("요청 성공(Producer 성공): " + success.get());
+        System.out.println("요청 성공(Redis 차감 + DB 저장): " + success.get());
         System.out.println("요청 실패(Redis 차감 실패): " + fail.get());
 
-        // 🔥 Consumer 비동기 처리 완료 대기
+        // step4: Order는 Service에서 동기적으로 생성되므로 latch 완료 시 즉시 stock개 존재
+        assertThat(success.get()).isEqualTo(stock);
+        assertThat(fail.get()).isEqualTo(userCount - stock);
+        assertThat(orderRepository.count()).isEqualTo(stock);
+        assertThat(orderRepository.countByOrderStatus(OrderStatus.PENDING)).isEqualTo(stock);
+
+        // Outbox도 동기적으로 저장되므로 즉시 검증 가능
+        assertThat(outboxRepository.count()).isEqualTo(stock);
+
+        // OutboxPoller(1초) → Kafka → Consumer 비동기 처리 완료 대기
         await()
-                .atMost(Duration.ofSeconds(5))
+                .atMost(Duration.ofSeconds(15))
                 .untilAsserted(() -> {
-                    assertThat(orderRepository.count()).isEqualTo(stock);
+                    long completedCount = orderRepository.countByOrderStatus(OrderStatus.COMPLETED);
+                    assertThat(completedCount).isEqualTo(stock);
                 });
 
-        // then - DB 재고 확인
-        Product updatedProduct = productRepository.findById(product.getId()).get();
-        System.out.println("DB 남은 재고: " + updatedProduct.getStock());
-
-        // then - Redis 재고 확인
+        // then - 최종 상태 검증
+        Product updatedProduct = productRepository.findById(product.getId()).orElseThrow();
         Long redisStock = Long.valueOf(
                 Objects.requireNonNull(redisTemplate.opsForValue().get(redisKey))
         );
-        System.out.println("Redis 남은 재고: " + redisStock);
-
-        // then - 주문 개수 확인
-        long orderCount = orderRepository.count();
-        System.out.println("생성된 주문 수: " + orderCount);
-
-        // then - Wallet 차감 확인
         long totalWalletBalance = walletRepository.findAll()
                 .stream()
                 .map(Wallet::getBalance)
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
                 .longValue();
 
+        System.out.println("DB 남은 재고: " + updatedProduct.getStock());
+        System.out.println("Redis 남은 재고: " + redisStock);
+        System.out.println("COMPLETED 주문 수: " + orderRepository.countByOrderStatus(OrderStatus.COMPLETED));
         System.out.println("전체 Wallet 잔액 합계: " + totalWalletBalance);
 
-        // 🔥 검증
-        assertThat(success.get()).isEqualTo(stock);
-        assertThat(fail.get()).isEqualTo(userCount - stock);
-
-        assertThat(orderCount).isEqualTo(stock);
+        assertThat(orderRepository.countByOrderStatus(OrderStatus.COMPLETED)).isEqualTo(stock);
+        assertThat(orderRepository.countByOrderStatus(OrderStatus.PENDING)).isEqualTo(0);
         assertThat(updatedProduct.getStock()).isEqualTo(0L);
         assertThat(redisStock).isEqualTo(0L);
+        assertThat(totalWalletBalance).isEqualTo(
+                (long) userCount * 100000 - (long) stock * price.longValue()
+        );
     }
 }
