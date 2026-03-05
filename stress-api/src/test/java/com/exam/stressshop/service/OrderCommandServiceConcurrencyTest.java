@@ -103,7 +103,7 @@ class OrderCommandServiceConcurrencyTest {
         System.out.println("요청 성공(Redis 차감 + DB 저장): " + success.get());
         System.out.println("요청 실패(Redis 차감 실패): " + fail.get());
 
-        // step4: Order는 Service에서 동기적으로 생성되므로 latch 완료 시 즉시 stock개 존재
+        // Order는 Service에서 동기적으로 생성되므로 latch 완료 시 즉시 stock개 존재
         assertThat(success.get()).isEqualTo(stock);
         assertThat(fail.get()).isEqualTo(userCount - stock);
         assertThat(orderRepository.count()).isEqualTo(stock);
@@ -125,6 +125,7 @@ class OrderCommandServiceConcurrencyTest {
         Long redisStock = Long.valueOf(
                 Objects.requireNonNull(redisTemplate.opsForValue().get(redisKey))
         );
+
         long totalWalletBalance = walletRepository.findAll()
                 .stream()
                 .map(Wallet::getBalance)
