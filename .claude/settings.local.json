@@ -1,7 +1,18 @@
 {
   "permissions": {
     "allow": [
-      "Bash(powershell:*)"
+      "Bash(powershell:*)",
+      "Bash(/tmp/convert.ps1:*)",
+      "Bash(TARGET=\"/c/Users/김건홍/Desktop/workspace/stressshop/k6/init/setup.sh\")",
+      "Bash(cp /tmp/setup_new.sh \"$TARGET\")",
+      "Bash(echo \"done: $?\")",
+      "Read(//c/Users/김건홍/Desktop/workspace/stressshop/**)",
+      "Bash(python3:*)",
+      "Bash(python:*)",
+      "Bash(where:*)",
+      "Bash(node:*)",
+      "Read(//dev/**)",
+      "Read(//c/Users/김건홍/Desktop/workspace/stressshop/p=C:/Users/김건홍/Desktop/workspace/stressshop/docs/**)"
     ]
   }
 }

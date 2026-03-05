@@ -81,6 +81,21 @@ services:
     volumes:
       - grafana_data:/var/lib/grafana
 
+  k6:
+    image: grafana/k6:latest
+    container_name: stress-k6
+    volumes:
+      - ./k6:/k6
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - BASE_URL=http://host.docker.internal:8888
+      - PRODUCT_ID=1
+      - STOCK=10000
+      - USER_COUNT=500
+    profiles:
+      - k6
+
 networks:
   kafka-net:
     driver: bridge

@@ -8,7 +8,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 
 @EnableJpaAuditing
 @EnableScheduling
-@EnableKafka
 @SpringBootApplication
 public class ApiApplication {
 
