@@ -1,6 +1,6 @@
 # Stress Shop
 
-한정판 상품 판매 시나리오를 통해 대규모 트래픽에서 발생하는 동시성 문제를 단계별로 해결하는 실습 프로젝트.
+한정판 상품 판매 시나리오를 통해 대규모 트래픽에서 발생하는 동시성 문제를 단계별로 해결하는 실습 프로젝트
 
 ## 시나리오
 
@@ -11,15 +11,15 @@
 
 ## 기술 스택
 
-| 분류 | 기술 |
-|------|------|
-| Language | Java 21 |
-| Framework | Spring Boot 3 |
-| DB | PostgreSQL |
-| Cache | Redis |
-| Message Queue | Apache Kafka |
+| 분류 | 기술                  |
+|------|---------------------|
+| Language | Java 17             |
+| Framework | Spring Boot 3       |
+| DB | PostgreSQL          |
+| Cache | Redis               |
+| Message Queue | Apache Kafka        |
 | Monitoring | Prometheus, Grafana |
-| Container | Docker Compose |
+| Container | Docker Compose      |
 
 ---
 
