@@ -20,6 +20,9 @@ services:
       - "9090:9090"
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--web.enable-remote-write-receiver'
 
   redis:
     image: redis:7
@@ -74,6 +77,7 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=admin
     volumes:
       - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
 
   k6:
     image: grafana/k6:latest
@@ -85,8 +89,10 @@ services:
     environment:
       - BASE_URL=http://host.docker.internal:8888
       - PRODUCT_ID=1
-      - STOCK=10000
-      - USER_COUNT=500
+      - STOCK=500
+      - USER_COUNT=1000
+      - K6_PROMETHEUS_RW_SERVER_URL=http://stress-prometheus:9090/api/v1/write
+      - K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM=true
     profiles:
       - k6
 

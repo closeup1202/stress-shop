@@ -4,9 +4,9 @@
 
 set -e
 
-# ─── 설정 ────────────────────────────────────────────
-USER_COUNT=500
-STOCK=10000
+# ─── 설정 (환경변수로 오버라이드 가능) ──────────────────
+USER_COUNT=${USER_COUNT:-1000}
+STOCK=${STOCK:-500}
 PRICE=1000
 WALLET_BALANCE=500000
 
@@ -69,3 +69,10 @@ echo ""
 echo "k6 실행 명령어:"
 echo "  docker compose run --rm -e PRODUCT_ID=$PRODUCT_ID k6 run /k6/scenarios/race.js"
 echo "  docker compose run --rm -e PRODUCT_ID=$PRODUCT_ID k6 run /k6/scenarios/stress.js"
+echo "  docker compose run --rm -e PRODUCT_ID=$PRODUCT_ID k6 run /k6/scenarios/spike.js"
+echo ""
+echo "k6 그라파나 연동시:"
+echo "  docker compose run --rm -e PRODUCT_ID=$PRODUCT_ID k6 run --out experimental-prometheus-rw /k6/scenarios/race.js"
+echo "  docker compose run --rm -e PRODUCT_ID=$PRODUCT_ID k6 run --out experimental-prometheus-rw /k6/scenarios/stress.js"
+echo "  docker compose run --rm -e PRODUCT_ID=$PRODUCT_ID k6 run --out experimental-prometheus-rw /k6/scenarios/spike.js"
+echo ""

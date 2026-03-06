@@ -30,6 +30,7 @@
 | Step 2 | `step2-redis` | Redis 선차감 + DB CAS | Redis → DB |
 | Step 3 | `step3-mq-async` | Redis 선차감 + Kafka 비동기 | Redis → MQ → Consumer |
 | Step 4 | `step4-outbox` | Outbox Pattern + Order 상태 관리 | Redis → DB(Outbox) → MQ → Consumer |
+| Step 5 | `step5-e2e-load-test` | k6 부하 테스트 (정합성 + 성능 검증) | Smoke / Race / Stress 시나리오 |
 
 ---
 
@@ -128,6 +129,50 @@ Kafka Consumer → Wallet + Stock + order.complete() → Order(COMPLETED)
 
 ---
 
+## Step 5 - k6 부하 테스트
+
+코드 변경 없이 Step 4 시스템을 k6로 검증한다. 네 가지 시나리오로 정합성과 성능을 확인한다.
+
+| 시나리오 | 목적 | 파일 |
+|---------|------|------|
+| **Smoke** | 배포 직후 최소 동작 확인 (VU 1, 30s) | `k6/scenarios/smoke.js` |
+| **Race** | 동시 주문 경쟁 — Oversell 없이 재고만큼만 처리되는지 검증 | `k6/scenarios/race.js` |
+| **Stress** | 점진적 부하 증가 (0→500 VU) — TPS·응답시간 측정 | `k6/scenarios/stress.js` |
+| **Spike** | 급격한 트래픽 폭증 — 스파이크 시 안정성과 복구 확인 | `k6/scenarios/spike.js` |
+
+**Race Test 결과** (재고 500, VU 1000 동시 주문)
+
+| 지표 | 결과 |
+|------|------|
+| 주문 성공 | 500건 (= 재고, Oversell 0건) |
+| 품절 처리 | 500건 |
+| 서버 에러 | 0건 |
+
+**Stress Test 결과** (재고 500, VU 0→500)
+
+| 지표 | 결과 |
+|------|------|
+| p(95) 응답시간 | 6ms |
+| p(99) 응답시간 | 22ms |
+| TPS | 53/s |
+| 5xx 에러 | 0건 |
+| TCP 연결 실패 | 10.81% |
+
+**Spike Test 결과** (VU 20→500 급격한 폭증)
+
+| 지표 | 결과 |
+|------|------|
+| p(95) 응답시간 | 7ms |
+| p(99) 응답시간 | 15ms |
+| 5xx 에러 | 0건 |
+| TCP 연결 실패 | 11.69% |
+
+TCP 연결 실패는 `dial: i/o timeout`으로 서버 에러가 아닌 OS 연결 큐 포화 현상이며, 서버가 수신한 요청은 100% 정상 처리됐다.
+
+> 상세 내용: [docs/k6-load-test.md](docs/k6-load-test.md)
+
+---
+
 ## 단계별 비교표
 
 ### 처리 구조
@@ -210,3 +255,4 @@ docker compose up -d
 | [redis-early-decrease.md](docs/redis-early-decrease.md) | Step 2 - Redis 선차감 패턴 |
 | [kafka-mq-async.md](docs/kafka-mq-async.md) | Step 3 - Kafka 비동기 처리 |
 | [kafka-outbox.md](docs/kafka-outbox.md) | Step 4 - Outbox Pattern |
+| [k6-load-test.md](docs/k6-load-test.md) | Step 5 - k6 부하 테스트 |

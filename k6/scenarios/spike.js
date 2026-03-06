@@ -1,20 +1,20 @@
 /**
- * Stress Test - 점진적 부하 증가
+ * Spike Test - 단일 트래픽 폭증
  *
- * 목적: 부하가 증가할수록 응답시간과 에러율이 어떻게 변하는지 관찰
- *       시스템이 버틸 수 있는 임계 TPS와 VU 수를 파악
+ * 목적: 평상시 트래픽에서 갑작스럽게 폭증한 뒤 복구되는 시나리오에서
+ *       시스템이 오류 없이 버티고 정상 상태로 돌아오는지 확인
  *
  * 단계:
- *   0 →  20 VU (30s) : 워밍업
- *  20 →  50 VU (60s) : 정상 부하
- *  50 → 100 VU (60s) : 높은 부하
- * 100 → 150 VU (60s) : 임계점 탐색
- * 150 →   0 VU (30s) : 복구 확인
+ *   0 →  20 VU (20s) : 평상시
+ *   20 → 500 VU ( 5s) : 급격한 폭증 (스파이크)
+ *   500 VU       (30s) : 폭증 유지
+ *   500 →  20 VU ( 5s) : 급격한 축소
+ *   20 →   0 VU (20s) : 복구 확인
  *
- * 참고: 재고가 소진되면 이후 요청은 모두 400(품절) 반환
- *       이 테스트는 처리량(TPS)과 응답시간 측정이 목적
+ * 참고: 스파이크 구간(5s) 동안 VU가 0 → 500으로 급격히 오르는 것이 핵심
+ *       복구 후 에러율과 응답시간이 정상으로 돌아오는지 관찰
  *
- * 실행: docker compose run --rm -e PRODUCT_ID=$PRODUCT_ID k6 run /k6/scenarios/stress.js
+ * 실행: docker compose run --rm -e PRODUCT_ID=$PRODUCT_ID k6 run /k6/scenarios/spike.js
  */
 
 import http from 'k6/http';
@@ -34,15 +34,15 @@ const orderDuration = new Trend('order_duration', true);
 
 export const options = {
     stages: [
-        { duration: '30s', target: 50  },  // 워밍업
-        { duration: '60s', target: 150 },  // 정상 부하
-        { duration: '60s', target: 300 },  // 높은 부하
-        { duration: '60s', target: 500 },  // 임계점
-        { duration: '30s', target: 0   },  // 복구
+        { duration: '20s', target: 20  },  // 평상시
+        { duration: '5s',  target: 500 },  // 급격한 폭증
+        { duration: '30s', target: 500 },  // 폭증 유지
+        { duration: '5s',  target: 20  },  // 급격한 축소
+        { duration: '20s', target: 0   },  // 복구 확인
     ],
     thresholds: {
-        // p95 2초, p99 5초 미만
-        http_req_duration: ['p(95)<2000', 'p(99)<5000'],
+        // p95 3초, p99 10초 미만 (스파이크 구간 감안)
+        http_req_duration: ['p(95)<3000', 'p(99)<10000'],
     },
 };
 
@@ -79,6 +79,5 @@ export default function () {
         orderServerError.add(1);
     }
 
-    // 실제 사용자처럼 요청 사이 짧은 대기 (0.1 ~ 0.5초)
     sleep(Math.random() * 0.4 + 0.1);
 }

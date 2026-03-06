@@ -30,9 +30,9 @@ bash k6/init/setup.sh
 ```
 ✓ 완료
   PRODUCT_ID  : 1
-  STOCK       : 100
-  USER_COUNT  : 200
-  Redis key   : product:stock:1 = 100
+  STOCK       : 500
+  USER_COUNT  : 1000
+  Redis key   : product:stock:1 = 500
 ```
 
 > setup.sh 출력의 PRODUCT_ID가 1이 아닌 경우 아래 명령어에서 PRODUCT_ID 값을 변경하세요.
@@ -59,29 +59,29 @@ docker compose run --rm k6 run /k6/scenarios/smoke.js
 
 ---
 
-### 2. Race Test - 동시 주문 경쟁 ⭐ 핵심
+### 2. Race Test - 동시 주문 경쟁
 
 ```bash
 docker compose run --rm \
   -e PRODUCT_ID=1 \
-  -e STOCK=100 \
-  -e USER_COUNT=200 \
+  -e STOCK=500 \
+  -e USER_COUNT=1000 \
   k6 run /k6/scenarios/race.js
 ```
 
-| 항목 | 설정 |
-|------|------|
-| VU | 200 (= USER_COUNT) |
-| iterations | 200 (각 VU 1회) |
-| 목적 | Oversell 발생 여부 확인 |
+| 항목 | 설정                  |
+|------|---------------------|
+| VU | 1000 (= USER_COUNT) |
+| iterations | 500 (각 VU 1회)       |
+| 목적 | Oversell 발생 여부 확인   |
 | 통과 기준 | 성공 건수 ≤ 재고, 5xx = 0 |
 
 **기대 결과:**
 ```
 === 동시 주문 경쟁 결과 ===
-총 요청     : 200건
-주문 성공   : 100건  (기대: 100건)
-품절 처리   : 100건
+총 요청     : 1000건
+주문 성공   : 500건  (기대: 500건)
+품절 처리   : 500건
 서버 에러   : 0건
 Oversell    : ✅ 없음
 ```
@@ -113,12 +113,12 @@ docker compose run --rm \
 docker-compose.yaml의 k6 서비스에 기본값이 설정되어 있습니다.
 `-e` 옵션으로 오버라이드할 수 있습니다.
 
-| 변수 | 기본값 | 설명 |
-|------|--------|------|
+| 변수 | 기본값                                | 설명 |
+|------|------------------------------------|------|
 | `BASE_URL` | `http://host.docker.internal:8888` | Spring Boot 서버 주소 |
-| `PRODUCT_ID` | `1` | 테스트 상품 ID (setup.sh 출력값 사용) |
-| `STOCK` | `100` | race.js - 기대 재고 수 |
-| `USER_COUNT` | `200` | race.js - 동시 사용자 수 |
+| `PRODUCT_ID` | `1`                                | 테스트 상품 ID (setup.sh 출력값 사용) |
+| `STOCK` | `500`                              | race.js - 기대 재고 수 |
+| `USER_COUNT` | `1000`                             | race.js - 동시 사용자 수 |
 
 ---
 

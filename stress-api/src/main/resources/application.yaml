@@ -8,8 +8,8 @@ spring:
     password: postgres
     hikari:
       maximum-pool-size: 50
-      minimum-idle: 10
-      connection-timeout: 2000
+      minimum-idle: 50
+      connection-timeout: 30000
       idle-timeout: 30000
       keepalive-time: 30000
       max-lifetime: 600000

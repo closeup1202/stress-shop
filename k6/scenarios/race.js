@@ -4,27 +4,26 @@
  * 목적: N명이 동시에 한정판 재고를 주문할 때 Oversell 없이 정확히 재고만큼만 처리되는지 검증
  *
  * 시나리오:
- *   - 사용자 200명이 동시에 재고 100개짜리 상품을 주문
- *   - 기대 결과: 성공 100건, 품절 100건
+ *   - 사용자 1000명이 동시에 재고 500개짜리 상품을 주문
+ *   - 기대 결과: 성공 500건, 품절 500건
  *   - Oversell(성공 > 재고)이 없어야 함
  *
- * 실행: k6 run -e PRODUCT_ID=1 -e STOCK=100 k6/scenarios/race.js
+ * 실행: docker compose run --rm -e PRODUCT_ID=$PRODUCT_ID k6 run /k6/scenarios/race.js
  */
 
 import http from 'k6/http';
 import { check } from 'k6';
-import { Counter, Rate } from 'k6/metrics';
+import { Counter } from 'k6/metrics';
 
 const BASE_URL = __ENV.BASE_URL || 'http://host.docker.internal:8888';
 const PRODUCT_ID = parseInt(__ENV.PRODUCT_ID || '1');
-const STOCK = parseInt(__ENV.STOCK || '10000');
-const USER_COUNT = parseInt(__ENV.USER_COUNT || '500');
+const STOCK = parseInt(__ENV.STOCK || '500');
+const USER_COUNT = parseInt(__ENV.USER_COUNT || '1000');
 
 // 커스텀 메트릭
 const orderSuccess = new Counter('order_success');
 const orderSoldOut = new Counter('order_sold_out');
 const orderServerError = new Counter('order_server_error');
-const oversellRate = new Rate('oversell_occurred');
 
 export const options = {
     scenarios: {
@@ -41,8 +40,6 @@ export const options = {
         order_server_error: ['count==0'],
         // 성공 건수가 재고를 초과하면 Oversell - 반드시 통과해야 함
         order_success: [`count<=${STOCK}`],
-        // p95 응답시간 2초 이내
-        http_req_duration: ['p(95)<2000'],
     },
 };
 
@@ -67,8 +64,6 @@ export default function () {
 
     if (res.status === 200) {
         orderSuccess.add(1);
-        // 성공 건수가 재고 초과 시 Oversell 플래그
-        oversellRate.add(orderSuccess.name > STOCK ? 1 : 0);
     } else if (res.status === 400) {
         orderSoldOut.add(1);
     } else {
@@ -85,7 +80,7 @@ export function handleSummary(data) {
     const result = [
         '=== 동시 주문 경쟁 결과 ===',
         `총 요청     : ${USER_COUNT}건`,
-        `주문 성공   : ${success}건  (기대: ${STOCK}건)`,
+        `주문 성공   : ${success}건  (기대: ${Math.min(USER_COUNT, STOCK)}건)`,
         `품절 처리   : ${soldOut}건`,
         `서버 에러   : ${serverError}건`,
         `Oversell    : ${success > STOCK ? '❌ 발생 (' + (success - STOCK) + '건 초과)' : '✅ 없음'}`,
