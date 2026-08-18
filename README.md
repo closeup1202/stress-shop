@@ -66,7 +66,7 @@ AND stock >= :quantity
 
 **문제점**: 모든 요청이 DB까지 도달하므로 대규모 트래픽 시 DB가 병목이 된다.
 
-> 상세 내용: [docs/compare-and-set.md](docs/compare-and-set.md)
+> 상세 내용: [docs/compare-and-set.md](docs/step1.%20compare-and-set.md)
 
 ---
 
@@ -83,7 +83,7 @@ DB 앞에 Redis를 배치해 트래픽을 1차로 차단한다.
 
 **문제점**: HTTP 스레드가 DB 처리(잔액 차감, 재고 차감, 주문 저장)가 완료될 때까지 대기한다.
 
-> 상세 내용: [docs/redis-early-decrease.md](docs/redis-early-decrease.md)
+> 상세 내용: [docs/redis-early-decrease.md](docs/step2.%20redis-early-decrease.md)
 
 ---
 
@@ -103,7 +103,7 @@ DB 처리를 Kafka Consumer에게 위임해 HTTP 스레드를 즉시 해제한�
 
 **문제점**: Kafka 발행이 실패하면 catch 블록의 Redis 롤백마저 실패할 수 있다. 발행과 롤백 사이의 원자성이 보장되지 않는다.
 
-> 상세 내용: [docs/kafka-mq-async.md](docs/kafka-mq-async.md)
+> 상세 내용: [docs/kafka-mq-async.md](docs/step3.%20kafka-mq-async.md)
 
 ---
 
@@ -127,7 +127,7 @@ Kafka Consumer → Wallet + Stock + order.complete() → Order(COMPLETED)
 - **Order 상태 추적**: PENDING → COMPLETED / FAILED 상태로 주문 처리 결과 조회 가능
 - **Prometheus Metrics**: `order_success_total`, `order_failed_total`, `order_dlq_total`
 
-> 상세 내용: [docs/kafka-outbox.md](docs/kafka-outbox.md)
+> 상세 내용: [docs/kafka-outbox.md](docs/step4.%20kafka-outbox.md)
 
 ---
 
@@ -253,8 +253,8 @@ docker compose up -d
 
 | 문서 | 내용 |
 |------|------|
-| [compare-and-set.md](docs/compare-and-set.md) | Step 1 - DB CAS 패턴 |
-| [redis-early-decrease.md](docs/redis-early-decrease.md) | Step 2 - Redis 선차감 패턴 |
-| [kafka-mq-async.md](docs/kafka-mq-async.md) | Step 3 - Kafka 비동기 처리 |
-| [kafka-outbox.md](docs/kafka-outbox.md) | Step 4 - Outbox Pattern |
+| [compare-and-set.md](docs/step1.%20compare-and-set.md) | Step 1 - DB CAS 패턴 |
+| [redis-early-decrease.md](docs/step2.%20redis-early-decrease.md) | Step 2 - Redis 선차감 패턴 |
+| [kafka-mq-async.md](docs/step3.%20kafka-mq-async.md) | Step 3 - Kafka 비동기 처리 |
+| [kafka-outbox.md](docs/step4.%20kafka-outbox.md) | Step 4 - Outbox Pattern |
 | [k6-load-test.md](docs/k6-load-test.md) | Step 5 - k6 부하 테스트 |
